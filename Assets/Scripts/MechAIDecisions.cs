@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Panda;
 
 public class MechAIDecisions : MechAI {
 
@@ -65,7 +66,7 @@ public class MechAIDecisions : MechAI {
         else
             FiringSystem();
 
-        //FSM - Behaviour Selection
+        /*//FSM - Behaviour Selection
         switch (mechState) {
             case (MechStates.Roam):
                 Roam();
@@ -89,9 +90,36 @@ public class MechAIDecisions : MechAI {
         else if (StatusCheck())
             mechState = MechStates.Flee;
         else
-            mechState = MechStates.Roam;
+            mechState = MechStates.Roam;*/
     }
 
+    [Task]
+    bool HasAttackTarget()
+    {
+        if (attackTarget)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    [Task]
+    bool TargetLOS()
+    {
+        if(mechAIAiming.LineOfSight(attackTarget))
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    [Task]
     //FSM Behaviour: Roam - Roam between random patrol points
     private void Roam() {
         //Move towards random patrol point
@@ -104,6 +132,7 @@ public class MechAIDecisions : MechAI {
         mechAIAiming.RandomAimTarget(patrolPoints);
     }
 
+    [Task]
     //FSM Behaviour: Attack 
     private void Attack() {
          
@@ -129,6 +158,7 @@ public class MechAIDecisions : MechAI {
         }
     }
 
+    [Task]
     //FSM Behaviour: Pursue
     void Pursue() {
 
@@ -146,6 +176,7 @@ public class MechAIDecisions : MechAI {
         }
     }
 
+    [Task]
     //FSM Behaviour: Flee
     void Flee() {
 
@@ -182,6 +213,7 @@ public class MechAIDecisions : MechAI {
         }
     }
 
+    [Task]
     //Method for checking heuristic status of Mech to determine if Fleeing is necessary
     private bool StatusCheck() {
 
