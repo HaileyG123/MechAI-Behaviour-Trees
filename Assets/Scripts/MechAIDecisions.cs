@@ -1,7 +1,10 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Panda;
+using ProBuilder2.Common;
+using Random = UnityEngine.Random;
 
 public class MechAIDecisions : MechAI {
 
@@ -38,6 +41,9 @@ public class MechAIDecisions : MechAI {
 
     //Flee Variables
     public GameObject fleeTarget;
+    
+    //GameManager
+    private GameManager gameManager;
 
     // Use this for initialization
     void Start () {
@@ -51,6 +57,9 @@ public class MechAIDecisions : MechAI {
         patrolPoints = GameObject.FindGameObjectsWithTag("Patrol Point");
         patrolIndex = Random.Range(0, patrolPoints.Length - 1);
         mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 1);
+        
+        //get game manager
+        gameManager = GameObject.FindObjectOfType<GameManager>();
     }
 
     // Update is called once per frame
@@ -125,7 +134,43 @@ public class MechAIDecisions : MechAI {
         //Move towards random patrol point
         if (Vector3.Distance(transform.position, patrolPoints[patrolIndex].transform.position) <= 2.0f) {
             patrolIndex = Random.Range(0, patrolPoints.Length - 1);
-        } else {
+        }
+        //if in line of sight check if patrol point has resource, otherwise choose new point
+        else if (mechAIAiming.LineOfSight(patrolPoints[patrolIndex]))
+        {
+            RaycastHit[] hits = Physics.RaycastAll(mechAIAiming.rayCastPoint.transform.position,
+                -(mechAIAiming.rayCastPoint.transform.position - patrolPoints[patrolIndex].transform.position).normalized, 
+                //make sure raycast only goes as far as the patrol point of interest
+                Vector3.Distance(mechAIAiming.rayCastPoint.transform.position, patrolPoints[patrolIndex].transform.position));
+
+            if (hits.Length > 0)
+            {
+                for (int i = 0; i < hits.Length; i++)
+                {
+                    //if there is a resource pack
+                    if (hits[i].transform.GetComponent<Pickup>())
+                    {
+                        mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 1);
+                        //Look at random patrol points
+                        mechAIAiming.RandomAimTarget(patrolPoints);
+                        return;
+                    }
+                }
+            }
+            //choose a different point if there is no resource pack
+            patrolIndex = Random.Range(0, patrolPoints.Length - 1);
+            
+            /*Debug.Log(patrolPoints[patrolIndex].gameObject.GetComponent<PickupSpawner>());
+            if (!patrolPoints[patrolIndex].gameObject.GetComponent<PickupSpawner>().pickup)
+            {
+                patrolIndex = Random.Range(0, patrolPoints.Length - 1);
+            }
+            else
+            {
+                mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 1);
+            }*/
+        }
+        else {
             mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 1);
         }
         //Look at random patrol points
@@ -189,12 +234,63 @@ public class MechAIDecisions : MechAI {
             mechAIAiming.RandomAimTarget(patrolPoints);
         }
 
-        //Move towards random patrol points <<< This could be drastically improved!
+        if (Vector3.Distance(transform.position, patrolPoints[patrolIndex].transform.position) <= 2.0f)
+        {
+            //choose closest patrol point that is out of sight of the attackTarget
+            if (attackTarget)
+            {
+                Array.Sort(patrolPoints, (a, b) =>
+                {
+                    return (int)(Vector3.Distance(b.transform.position, transform.position) - Vector3.Distance(a.transform.position, transform.position));
+                });
+
+                for (int i = 0; i < patrolPoints.Length; i++)
+                {
+                    if (LineOfSight(patrolPoints[i].transform.position, attackTarget))
+                    {
+                        patrolIndex = i;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                patrolIndex = Random.Range(0, patrolPoints.Length - 1);
+            }
+        }
+        else
+        {
+            mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 1);
+        }
+        
+        /*//Move towards random patrol points <<< This could be drastically improved!
         if (Vector3.Distance(transform.position, patrolPoints[patrolIndex].transform.position) <= 2.0f) {
             patrolIndex = Random.Range(0, patrolPoints.Length - 1);
         } else {
             mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 1);
+        }*/
+    }
+
+    //Method to determine if object is within LOS of Mech
+    private bool LineOfSight(Vector3 position, GameObject thisTarget) {
+
+        //Need to correct for wonky pivot point - Mech model pivot at base instead of centre
+        Vector3 correction = thisTarget.transform.GetChild(0).gameObject.transform.position;
+
+        RaycastHit hit;
+        if (Physics.Raycast(position, -(position - correction).normalized, out hit, 100.0f)) {
+
+            Debug.DrawLine(position, hit.point, Color.red);
+            //if the raycasthit travelled further than the proposed position, there is a clear line of sight
+            if (hit.distance > Vector3.Distance(position, thisTarget.transform.position))
+            {
+                return true;
+            }
+            else
+                return false;
         }
+        else
+            return false;
     }
 
     //Method allowing AI Mech to acquire target after taking damage from enemy
@@ -215,11 +311,27 @@ public class MechAIDecisions : MechAI {
 
     [Task]
     //Method for checking heuristic status of Mech to determine if Fleeing is necessary
-    private bool StatusCheck() {
+    private bool StatusCheck()
+    {
 
-        float status = mechSystem.health + mechSystem.energy + (mechSystem.shells * 7) + (mechSystem.missiles * 10);
+        float status = 0;
+        int attacked = 1;
+        
+        //number of deaths and score variables
+        int score = gameManager.playerScores[mechSystem.ID - 1];
+        int deaths = gameManager.playerDeaths[mechSystem.ID - 1];
+        
+        if (attackTarget)
+        {
+            status += Vector3.Distance(transform.position, attackTarget.transform.position);
+            attacked = 2;
+        }
+        
+        status += (mechSystem.health * 0.5f) + mechSystem.energy + (mechSystem.shells * 3) +
+                 (mechSystem.missiles * 5) - deaths + (score * 2);
+        
 
-        if (status > 1500)
+        if (status > 1500 * attacked)
             return false;
         else
             return true;
