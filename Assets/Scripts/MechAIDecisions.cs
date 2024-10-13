@@ -183,23 +183,32 @@ public class MechAIDecisions : MechAI {
          
         //If there is a target, set it as the aimTarget 
         if (attackTarget && mechAIAiming.LineOfSight(attackTarget)) {
-
-            //Child object correction - wonky pivot point
-            mechAIAiming.aimTarget = attackTarget.transform.GetChild(0).gameObject;
-
-            //Move Towards attack Target
-            if (Vector3.Distance(transform.position, attackTarget.transform.position) >= 45.0f) {
-                mechAIMovement.Movement(attackTarget.transform.position, 45);
+            //There is a 25% chance the mech just runs away
+            float rnd = Random.Range(0, 1);
+            if (rnd < 0.25)
+            {
+                mechState = MechStates.Flee;
             }
-            //Otherwise "strafe" - move towards random patrol points at intervals
-            else if (Vector3.Distance(transform.position, attackTarget.transform.position) < 45.0f && Time.time > attackTimer) {
-                patrolIndex = Random.Range(0, patrolPoints.Length - 1);
-                mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 2);
-                attackTimer = Time.time + attackTime + Random.Range(-0.5f, 0.5f);
-            }
+            else
+            {
+                //Child object correction - wonky pivot point
+                mechAIAiming.aimTarget = attackTarget.transform.GetChild(0).gameObject;
 
-            //Track position of current target to pursue if lost
-            pursuePoint = attackTarget.transform.position;
+                //Move Towards attack Target
+                Vector3 wonky = new Vector3(Random.Range(-1, 1), 0, Random.Range(-1, 1)); //variation in movement
+                if (Vector3.Distance(transform.position, attackTarget.transform.position) >= 45.0f) {
+                    mechAIMovement.Movement(attackTarget.transform.position + wonky, 45);
+                }
+                //Otherwise "strafe" - move towards random patrol points at intervals
+                else if (Vector3.Distance(transform.position, attackTarget.transform.position) < 45.0f && Time.time > attackTimer) {
+                    patrolIndex = Random.Range(0, patrolPoints.Length - 1);
+                    mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 2);
+                    attackTimer = Time.time + attackTime + Random.Range(-0.5f, 0.5f);
+                }
+
+                //Track position of current target to pursue if lost
+                pursuePoint = attackTarget.transform.position;
+            }
         }
     }
 
@@ -207,6 +216,14 @@ public class MechAIDecisions : MechAI {
     //FSM Behaviour: Pursue
     void Pursue() {
 
+        /*//randomly might start firing
+        float rnd = Random.Range(0, 1);
+        if (rnd < 0.1)
+        {
+            RaycastHit hit;
+            Physics.Raycast(transform.position, transform.forward, out hit);
+            attackTarget = hit.transform.gameObject;
+        }*/
         //Move towards last known position of attackTarget
         if (Vector3.Distance(transform.position, pursuePoint) > 3.0f) {
             mechAIMovement.Movement(pursuePoint, 1);
@@ -318,8 +335,8 @@ public class MechAIDecisions : MechAI {
         int attacked = 1;
         
         //number of deaths and score variables
-        int score = gameManager.playerScores[mechSystem.ID - 1];
-        int deaths = gameManager.playerDeaths[mechSystem.ID - 1];
+        int score = gameManager.playerScores[mechSystem.ID];
+        int deaths = gameManager.playerDeaths[mechSystem.ID];
         
         if (attackTarget)
         {
