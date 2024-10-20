@@ -162,16 +162,6 @@ public class MechAIDecisions : MechAI {
             }
             //choose a different point if there is no resource pack
             patrolIndex = Random.Range(0, patrolPoints.Length - 1);
-            
-            /*Debug.Log(patrolPoints[patrolIndex].gameObject.GetComponent<PickupSpawner>());
-            if (!patrolPoints[patrolIndex].gameObject.GetComponent<PickupSpawner>().pickup)
-            {
-                patrolIndex = Random.Range(0, patrolPoints.Length - 1);
-            }
-            else
-            {
-                mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 1);
-            }*/
         }
         else {
             mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 1);
@@ -218,15 +208,6 @@ public class MechAIDecisions : MechAI {
     [Task]
     //FSM Behaviour: Pursue
     void Pursue() {
-
-        /*//randomly might start firing
-        float rnd = Random.Range(0, 1);
-        if (rnd < 0.1)
-        {
-            RaycastHit hit;
-            Physics.Raycast(transform.position, transform.forward, out hit);
-            attackTarget = hit.transform.gameObject;
-        }*/
         //Move towards last known position of attackTarget
         if (Vector3.Distance(transform.position, pursuePoint) > 3.0f) {
             mechAIMovement.Movement(pursuePoint, 5); //keep distance
@@ -344,15 +325,15 @@ public class MechAIDecisions : MechAI {
         if (attackTarget)
         {
             status += Vector3.Distance(transform.position, attackTarget.transform.position); //more likely to attack when further away
-            if(attackTarget.GetComponent<MechSystems>().health < 1000)
+            if(attackTarget.GetComponent<MechSystems>().health < 1000) // more likely to attack when the attackTarget is low on health
             {
                 status *= 1.5f;
             }
-            attacked = 2;
+            attacked = 2; //the threshold to start attacking is higher if there is an attack target -> fear factor
         }
         
         status += (mechSystem.health * 0.5f) + mechSystem.energy + (mechSystem.shells * 3) +
-                 (mechSystem.missiles * 5) - deaths + (score * 2);
+                 (mechSystem.missiles * 5) - deaths + (score * 2); //less likely to attack if it has already died
         
 
         if (status > 1500 * attacked)
