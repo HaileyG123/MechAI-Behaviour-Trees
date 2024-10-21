@@ -47,6 +47,7 @@ public class MechAIDecisions : MechAI {
 
     //Being attacked
     public bool beingAttacked;
+    private float fearFactor;
 
     // Use this for initialization
     void Start () {
@@ -75,34 +76,6 @@ public class MechAIDecisions : MechAI {
             attackTarget = mechAIAiming.ClosestTarget(mechAIAiming.currentTargets);
             mechAIWeapons.laserBeamAI = false;  //Hard disable on laserBeam
         }
-        /*else
-            FiringSystem();*/
-
-        /*//FSM - Behaviour Selection
-        switch (mechState) {
-            case (MechStates.Roam):
-                Roam();
-            break;
-            case (MechStates.Attack):
-                Attack();
-            break;
-            case (MechStates.Pursue):
-                Pursue();
-            break;
-            case (MechStates.Flee):
-                Flee();
-            break;
-        }
-
-        //FSM Transition Logic - Replace this with Decision Tree implementation!
-        if (attackTarget && !mechAIAiming.LineOfSight(attackTarget) && !StatusCheck())
-            mechState = MechStates.Pursue;
-        else if (attackTarget && mechAIAiming.LineOfSight(attackTarget) && !StatusCheck())
-            mechState = MechStates.Attack;
-        else if (StatusCheck())
-            mechState = MechStates.Flee;
-        else
-            mechState = MechStates.Roam;*/
     }
 
     [Task]
@@ -134,6 +107,7 @@ public class MechAIDecisions : MechAI {
     [Task]
     //FSM Behaviour: Roam - Roam between random patrol points
     private void Roam() {
+        fearFactor = 0;
         //Move towards random patrol point
         if (Vector3.Distance(transform.position, patrolPoints[patrolIndex].transform.position) <= 2.0f) {
             patrolIndex = Random.Range(0, patrolPoints.Length - 1);
@@ -180,10 +154,12 @@ public class MechAIDecisions : MechAI {
             float rnd = Random.Range(0, 1);
             if (rnd < 0.25)
             {
-                mechState = MechStates.Flee;
+                fearFactor = 1500; //almost guaranteed to flee
             }
             else
             {
+                fearFactor = 0; //will keep attacking
+
                 //Child object correction - wonky pivot point
                 mechAIAiming.aimTarget = attackTarget.transform.GetChild(0).gameObject;
 
@@ -208,6 +184,8 @@ public class MechAIDecisions : MechAI {
     [Task]
     //FSM Behaviour: Pursue
     void Pursue() {
+
+        fearFactor = 0;
         //Move towards last known position of attackTarget
         if (Vector3.Distance(transform.position, pursuePoint) > 3.0f) {
             mechAIMovement.Movement(pursuePoint, 5); //keep distance
@@ -218,13 +196,16 @@ public class MechAIDecisions : MechAI {
             attackTarget = null;
             patrolIndex = Random.Range(0, patrolPoints.Length - 1);
             mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 1);
-            mechState = MechStates.Roam;
+            //mechState = MechStates.Roam;
+            attackTarget = null; //got back to roaming
         }
     }
 
     [Task]
     //FSM Behaviour: Flee
     void Flee() {
+
+        fearFactor = 0;
 
         //If there is an attack target, set it as the aimTarget 
         if (attackTarget && mechAIAiming.LineOfSight(attackTarget)) {
@@ -263,13 +244,6 @@ public class MechAIDecisions : MechAI {
         {
             mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 1);
         }
-        
-        /*//Move towards random patrol points <<< This could be drastically improved!
-        if (Vector3.Distance(transform.position, patrolPoints[patrolIndex].transform.position) <= 2.0f) {
-            patrolIndex = Random.Range(0, patrolPoints.Length - 1);
-        } else {
-            mechAIMovement.Movement(patrolPoints[patrolIndex].transform.position, 1);
-        }*/
     }
 
     //Method to determine if object is within LOS of Mech
@@ -314,9 +288,8 @@ public class MechAIDecisions : MechAI {
     //Method for checking heuristic status of Mech to determine if Fleeing is necessary
     private bool StatusCheck()
     {
-
         float status = 0;
-        int attacked = 1;
+        float attacked = 1;
         
         //number of deaths and score variables
         int score = gameManager.playerScores[mechSystem.ID];
@@ -329,14 +302,15 @@ public class MechAIDecisions : MechAI {
             {
                 status *= 1.5f;
             }
-            attacked = 2; //the threshold to start attacking is higher if there is an attack target -> fear factor
+            //attacked = 1.5f; //the threshold to start attacking is higher if there is an attack target -> fear factor
         }
         
         status += (mechSystem.health * 0.5f) + mechSystem.energy + (mechSystem.shells * 3) +
-                 (mechSystem.missiles * 5) - deaths + (score * 2); //less likely to attack if it has already died
+                 (mechSystem.missiles * 5) - deaths + (score * 2) //less likely to attack if it has already died
+                 - fearFactor; 
         
 
-        if (status > 1500 * attacked)
+        if (status > 1500)
             return false;
         else
             return true;
@@ -365,7 +339,8 @@ public class MechAIDecisions : MechAI {
         //Laser Beam - Strict range, plenty of energy and very tight firing angle
         if (Vector3.Distance(transform.position, attackTarget.transform.position) > 20
             && Vector3.Distance(transform.position, attackTarget.transform.position) < 50
-            && mechSystem.energy >= 300 && mechAIAiming.FireAngle(10))
+            && mechSystem.energy >= 300 && mechAIAiming.FireAngle(10)
+            && (!StatusCheck() || !HasAttackTarget())) //check if the mech is currently fleeing
             mechAIWeapons.laserBeamAI = true;
         else
             mechAIWeapons.laserBeamAI = false;
@@ -379,12 +354,4 @@ public class MechAIDecisions : MechAI {
             && mechSystem.missiles >= 18 && mechAIAiming.FireAngle(5))
             mechAIWeapons.MissileArray();
     }
-
-    [Task]
-    //Method that handles head movement
-    private void Swivel()
-    {
-        mechAIAiming.RandomAimTarget(patrolPoints);
-    }
-
 }
