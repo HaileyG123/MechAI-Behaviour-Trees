@@ -6,7 +6,7 @@ using Panda;
 using ProBuilder2.Common;
 using Random = UnityEngine.Random;
 
-public class MechAIDecisions : MechAI {
+public class MechAIDecisions_HaileyGraham : MechAI {
 
     public string botName = "Test Bot";
 
