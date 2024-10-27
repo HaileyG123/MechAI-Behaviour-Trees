@@ -1,11 +1,12 @@
 tree("Root")
         repeat
                 mute
-                        parallel
+                        race
                                 tree "Firing"
                                 tree "Cannoning"
                                 tree "Beaming"
                                 tree "Missiling"
+                                tree "Swivelling"
 tree("Firing")
         while
                 sequence
@@ -30,3 +31,10 @@ tree("Missiling")
                         HasAttackTarget()
                 repeat
                         MissileArray()
+tree("Swivelling")
+        while
+                sequence
+                        HasAttackTarget()
+                        not TargetLOS()
+                repeat
+                        Swivel()

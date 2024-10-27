@@ -94,14 +94,19 @@ public class MechAIDecisions : MechAI {
     [Task]
     bool TargetLOS()
     {
-        if(mechAIAiming.LineOfSight(attackTarget))
+        if (attackTarget)
         {
-            return true;
+            if(mechAIAiming.LineOfSight(attackTarget))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
-        else
-        {
-            return false;
-        }
+
+        return false;
     }
 
     [Task]
